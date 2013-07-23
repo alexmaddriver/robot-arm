@@ -3,12 +3,13 @@ import g4p_controls.*;
 
 int GRID_STEP = 10;
 
-float theta1 = 0;
-float theta2 = 0;
 int a1 = 10;
 int a2 = 10;
 
-float Xc, Yc;
+float newXc = 20, newYc = 0;
+float oldXc = 20, oldYc = 0;
+float[] oldJoints = {0, 0};
+boolean newPositionRequested = true;
 
 GSlider j1Slider;
 GSlider j2Slider;
@@ -29,26 +30,63 @@ void setup() {
 }
 
 void draw() {
-  background(255);  
-  drawGrid();
-  drawWorkspace();
-  
-  float D = (Xc*Xc + Yc*Yc - a1*a1 - a2*a2) / (2*a1*a2);
-  
-  theta2 = degrees(atan2(sqrt(1 - D*D), D));  
-  theta1 = degrees(atan2(Yc, Xc) - atan2(a2*sin(radians(theta2)), a1+a2*cos(radians(theta2))));
-  
-  println("Xc=" + Xc + ", Yc=" + Yc + ", D=" + D + ", theta2=" + theta2 + ", theta1=" + theta1);
- 
-  drawArm();
+  if (newPositionRequested) {
+    background(255);  
+    drawGrid();
+    drawWorkspace();
+
+    drawArm(oldJoints);
+    
+    float stepsNumber = ceil (sqrt(sq(newXc-oldXc) + sq(newYc-oldYc)) / 1);
+    println("stepsNumber=" + stepsNumber);
+    
+    for (int step=1; step<=stepsNumber; step++) {
+      float curXc = oldXc + (newXc-oldXc)/stepsNumber*step;
+      float curYc = oldYc + (newYc-oldYc)/stepsNumber*step;
+      println("curXc=" + curXc + ", curYc=" + curYc);
+
+      float[] newJoints = calcConfigurationPoint(curXc, curYc);
+
+      float moveTime = ceil (max(abs(newJoints[0]-oldJoints[0]), abs(newJoints[1]-oldJoints[1]))); 
+      for (int t=1; t<=moveTime; t++) {
+        float q1 = oldJoints[0] + (newJoints[0] - oldJoints[0])*t/moveTime;
+        float q2 = oldJoints[1] + (newJoints[1] - oldJoints[1])*t/moveTime;
+      
+        drawEndEffectorTrace(q1, q2);
+      }
+      oldJoints = newJoints;
+      
+      if (step == stepsNumber)
+        drawArm(newJoints);
+    }
+    
+    oldXc = newXc;
+    oldYc = newYc;  
+    newPositionRequested = false;
+  }
 }
 
-void drawArm() {
-  float x10 = a1*cos(radians(theta1))*GRID_STEP;
-  float y10 = a1*sin(radians(theta1))*GRID_STEP;
+float[] calcConfigurationPoint(float x, float y){
+  float D = (x*x + y*y - a1*a1 - a2*a2) / (2*a1*a2);  
+  float q2 = degrees(atan2(sqrt(1 - D*D), D));  
+  float q1 = degrees(atan2(y, x) - atan2(a2*sin(radians(q2)), a1+a2*cos(radians(q2))));
+  
+  println("calcConfigurationPoint(): x=" + x + ", y=" + y + ", D=" + D + ", q1=" + q1 + ", q2=" + q2);
+  return new float[] {q1, q2};
+}
 
-  float x20 = x10 + a2*cos(radians(theta1+theta2))*GRID_STEP;
-  float y20 = y10 + a2*sin(radians(theta1+theta2))*GRID_STEP;
+void drawEndEffectorTrace(float q1, float q2){
+  float x20 = a1*cos(radians(q1))*GRID_STEP + a2*cos(radians(q1+q2))*GRID_STEP;
+  float y20 = a1*sin(radians(q1))*GRID_STEP + a2*sin(radians(q1+q2))*GRID_STEP;
+  point(width/2 + x20, height/2 - y20);
+}
+
+void drawArm(float[] joints) {
+  float x10 = a1*cos(radians(joints[0]))*GRID_STEP;
+  float y10 = a1*sin(radians(joints[0]))*GRID_STEP;
+
+  float x20 = x10 + a2*cos(radians(joints[0]+joints[1]))*GRID_STEP;
+  float y20 = y10 + a2*sin(radians(joints[0]+joints[1]))*GRID_STEP;
   drawArm(x10, y10, x20, y20);
 }
 
@@ -70,15 +108,18 @@ void mouseClicked() {
   float x0 = width/2;
   float y0 = height/2;
   
-  Xc = (mouseX - x0) / GRID_STEP;
-  Yc = (y0 - mouseY) / GRID_STEP;
+  newXc = (mouseX - x0) / GRID_STEP;
+  newYc = (y0 - mouseY) / GRID_STEP;
+
+  println ("newXc=" + newXc + ", newYc=" + newYc);  
+  newPositionRequested = true;
 }
 
 public void handleSliderEvents(GValueControl slider, GEvent event) { 
-  if (slider == j1Slider)
-    theta1 = slider.getValueF();
-  if (slider == j2Slider)
-    theta2 = slider.getValueF();
+//  if (slider == j1Slider)
+//    theta1 = slider.getValueF();
+//  if (slider == j2Slider)
+//    theta2 = slider.getValueF();
 }
 
 void drawWorkspace(){
@@ -110,8 +151,8 @@ void drawGrid()
 void drawWorkspace(float theta1Start, float theta1End, float theta2Start, float theta2End){
   stroke(#FF0000);
   
-  for (theta1=theta1Start; theta1<=theta1End; theta1++){
-    for (theta2=theta2Start; theta2<=theta2End; theta2++){
+  for (float theta1=theta1Start; theta1<=theta1End; theta1++){
+    for (float theta2=theta2Start; theta2<=theta2End; theta2++){
       float x10 = a1*cos(radians(theta1))*GRID_STEP;
       float y10 = a1*sin(radians(theta1))*GRID_STEP;
 
