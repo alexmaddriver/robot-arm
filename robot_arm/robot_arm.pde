@@ -1,5 +1,5 @@
+import processing.serial.*;
 import g4p_controls.*;
-
 
 int GRID_STEP = 10;
 
@@ -13,10 +13,14 @@ boolean newPositionRequested = true;
 
 GSlider j1Slider;
 GSlider j2Slider;
+Serial serial;
 
 void setup() {
   size(displayWidth/2, displayHeight/2);
   frameRate(10);
+
+  println(Serial.list());
+  serial = new Serial(this, Serial.list()[1], 9600);
 
   j1Slider = new GSlider(this, 55, 80, 200, 100, 10);
   j1Slider.setLimits(0, 0, 360);
@@ -79,6 +83,10 @@ void drawEndEffectorTrace(float q1, float q2){
   float x20 = a1*cos(radians(q1))*GRID_STEP + a2*cos(radians(q1+q2))*GRID_STEP;
   float y20 = a1*sin(radians(q1))*GRID_STEP + a2*sin(radians(q1+q2))*GRID_STEP;
   point(width/2 + x20, height/2 - y20);
+  
+  String command = (int)q1 + ":" + (int)q2 + ";";
+  println(command);
+  serial.write(command);
 }
 
 void drawArm(float[] joints) {
